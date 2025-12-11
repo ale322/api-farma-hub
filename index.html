@@ -15,22 +15,20 @@
         .content { padding: 20px; }
         .doctor-msg { background: #e9ecef; padding: 10px; border-radius: 10px; margin-bottom: 20px; font-style: italic; color: #555; }
         
-        /* Botão de Busca */
         .btn-action {
             width: 100%; padding: 15px; background-color: #28a745; color: white; 
             border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-bottom: 20px;
         }
         .btn-action:hover { background-color: #218838; }
 
-        /* Card da Farmácia */
         .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .card h3 { margin: 0 0 5px 0; font-size: 16px; color: #333; }
         .card p { margin: 0; color: #666; font-size: 12px; }
         .price { font-weight: bold; color: #007bff; font-size: 18px; }
         .badge { font-size: 10px; padding: 3px 6px; border-radius: 4px; color: white; }
         .bg-green { background-color: #28a745; }
-        .bg-red { background-color: #dc3545; }
-
+        
+        .distance-info { font-size: 11px; color: #666; margin-top: 5px; display: block; }
     </style>
 </head>
 <body>
@@ -46,40 +44,87 @@
                 "Olá! Prescrevi <b>Dipirona 500mg</b> para sua dor de cabeça. Clique abaixo para ver onde comprar."
             </div>
 
-            <button class="btn-action" onclick="buscarRemedio('789101010')">
+            <button class="btn-action" onclick="iniciarBusca('789101010')">
                 💊 Ver Disponibilidade (Dipirona)
             </button>
             
-            <button class="btn-action" style="background-color: #6c757d;" onclick="buscarRemedio('789202020')">
+            <button class="btn-action" style="background-color: #6c757d;" onclick="iniciarBusca('789202020')">
                 💊 Ver Disponibilidade (Tylenol)
             </button>
 
             <h4 style="margin-top: 20px;">Farmácias Próximas:</h4>
             <div id="resultados">
-                <p style="text-align:center; color:#999;">Nenhuma busca realizada.</p>
+                <p style="text-align:center; color:#999;">Clique acima para buscar.</p>
             </div>
         </div>
     </div>
 
     <script>
-        async function buscarRemedio(ean) {
-            const divResultados = document.getElementById('resultados');
-            divResultados.innerHTML = '<p style="text-align:center;">🔍 Buscando estoques em tempo real...</p>';
+        // Mude aqui para o seu link do Render se já tiver subido a API nova
+        // Se estiver testando local, use http://localhost:5000
+        const API_BASE = "https://api-farma-hub.onrender.com"; 
 
+        function iniciarBusca(ean) {
+            const divResultados = document.getElementById('resultados');
+            divResultados.innerHTML = '<p style="text-align:center;">📡 Pedindo sua localização...</p>';
+
+            // 1. Tenta pegar o GPS do navegador
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        // Sucesso: temos GPS
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        fazerRequisicao(ean, lat, lon);
+                    },
+                    (error) => {
+                        // Erro ou Negado: busca sem GPS
+                        console.warn("GPS negado ou erro:", error);
+                        divResultados.innerHTML = '<p style="text-align:center; color:orange;">⚠️ Localização não permitida. Buscando geral...</p>';
+                        fazerRequisicao(ean, null, null);
+                    }
+                );
+            } else {
+                // Navegador muito antigo
+                fazerRequisicao(ean, null, null);
+            }
+        }
+
+        async function fazerRequisicao(ean, lat, lon) {
+            const divResultados = document.getElementById('resultados');
+            
             try {
-                // Chama a SUA API local
-                const response = await fetch(`http://localhost:5000/search?ean=${ean}`);
+                // Monta a URL (com ou sem coordenadas)
+                let url = `${API_BASE}/search?ean=${ean}`;
+                if (lat && lon) {
+                    url += `&lat=${lat}&lon=${lon}`;
+                }
+
+                divResultados.innerHTML = '<p style="text-align:center;">🔍 Consultando farmácias...</p>';
+
+                const response = await fetch(url);
                 const data = await response.json();
 
-                divResultados.innerHTML = ''; // Limpa "buscando..."
+                divResultados.innerHTML = '';
 
                 if (data.length === 0) {
-                    divResultados.innerHTML = '<p style="text-align:center; color:red;">❌ Nenhuma farmácia tem estoque deste item agora.</p>';
+                    divResultados.innerHTML = '<p style="text-align:center; color:red;">❌ Nenhuma farmácia tem estoque.</p>';
                     return;
                 }
 
-                // Cria os cards para cada farmácia encontrada
                 data.forEach(item => {
+                    // Se não tiver cálculo de distância, mostra texto padrão
+                    let distanciaTexto = "";
+                    let tempoTexto = "";
+                    
+                    if (item.distancia_txt && item.distancia_txt !== "0.0 km") {
+                        distanciaTexto = `<span class="distance-info">📍 ${item.distancia_txt} de você</span>`;
+                        tempoTexto = `<small>Entrega: ${item.tempo}</small>`;
+                    } else {
+                        distanciaTexto = `<span class="distance-info">📍 Distância desconhecida</span>`;
+                        tempoTexto = `<small>Entrega: A consultar</small>`;
+                    }
+
                     const card = document.createElement('div');
                     card.className = 'card';
                     card.innerHTML = `
@@ -87,10 +132,11 @@
                             <h3>${item.farmacia}</h3>
                             <p>${item.endereco}</p>
                             <span class="badge bg-green">Estoque: ${item.estoque} un</span>
+                            ${distanciaTexto}
                         </div>
                         <div style="text-align:right;">
                             <div class="price">${item.preco}</div>
-                            <small>Entrega: 40min</small>
+                            ${tempoTexto}
                         </div>
                     `;
                     divResultados.appendChild(card);
@@ -98,7 +144,7 @@
 
             } catch (error) {
                 console.error(error);
-                divResultados.innerHTML = '<p style="text-align:center; color:red;">Erro ao conectar no servidor. Ele está rodando?</p>';
+                divResultados.innerHTML = '<p style="text-align:center; color:red;">Erro de conexão com a Nuvem.</p>';
             }
         }
     </script>

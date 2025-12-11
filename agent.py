@@ -3,7 +3,7 @@ import time
 import random
 
 # CONFIGURAÇÕES DA FARMÁCIA (Isso estaria num arquivo config.ini na vida real)
-API_URL = "http://localhost:5000/sync"
+API_URL = "https://api-farma-hub.onrender.com/sync"
 API_KEY = "key_farma_01" # A mesma chave que cadastramos no banco de dados
 
 # Simulação do ERP Local da Farmácia
