@@ -6,30 +6,17 @@
     <title>Dr. Consulta App</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
-        .phone-frame {
-            max_width: 400px; margin: 0 auto; background: white; 
-            border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); 
-            overflow: hidden; min-height: 600px;
-        }
+        .phone-frame { max-width: 400px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); overflow: hidden; min-height: 600px; }
         .header { background-color: #007bff; color: white; padding: 20px; text-align: center; }
         .content { padding: 20px; }
-        .doctor-msg { background: #e9ecef; padding: 10px; border-radius: 10px; margin-bottom: 20px; font-style: italic; color: #555; }
-        
-        .btn-action {
-            width: 100%; padding: 15px; background-color: #28a745; color: white; 
-            border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-bottom: 20px;
-        }
-        .btn-action:hover { background-color: #218838; }
-
         .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .card h3 { margin: 0 0 5px 0; font-size: 16px; color: #333; }
-        .card p { margin: 0; color: #666; font-size: 12px; }
         .price { font-weight: bold; color: #007bff; font-size: 18px; }
-        .badge { font-size: 10px; padding: 3px 6px; border-radius: 4px; color: white; }
-        .bg-green { background-color: #28a745; }
-        
-        .distance-info { font-size: 11px; color: #666; margin-top: 5px; display: block; }
-        .simulacao-msg { font-size: 11px; color: blue; text-align: center; margin-bottom: 10px; background: #e7f3ff; padding: 5px; border-radius: 4px; display: none; }
+        .btn-zap { display:inline-block; margin-top:5px; background:#25D366; color:white; padding:8px 12px; text-decoration:none; font-size:13px; border-radius:4px; font-weight:bold; cursor: pointer; }
+        .btn-zap:hover { background-color: #1ebc57; }
+        .badge { font-size: 10px; padding: 3px 6px; border-radius: 4px; color: white; background-color: #28a745; }
+        .simulacao-msg { font-size: 11px; color: blue; text-align: center; margin-bottom: 10px; background: #e7f3ff; padding: 5px; display: none; }
+        .btn-action { width: 100%; padding: 15px; background-color: #28a745; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-bottom: 20px; }
+        .error-msg { color: red; text-align: center; font-size: 12px; display: none; }
     </style>
 </head>
 <body>
@@ -37,160 +24,91 @@
     <div class="phone-frame">
         <div class="header">
             <h2>Dr. Consulta App</h2>
-            <small>Sua receita digital</small>
+            <small>Monitoramento Ativo</small>
         </div>
 
         <div class="content">
-            <div class="doctor-msg">
-                "Olá! Prescrevi <b>Dipirona 500mg</b> para sua dor de cabeça. Clique abaixo para ver onde comprar."
-            </div>
+            <div id="aviso-simulacao" class="simulacao-msg">⚠️ Modo Simulação: Localização Salvador.</div>
+            <div id="erro-global" class="error-msg"></div>
 
-            <div id="aviso-simulacao" class="simulacao-msg">
-                ⚠️ GPS indisponível no PC. Simulando localização em Salvador (Barra).
-            </div>
-
-            <button class="btn-action" onclick="iniciarBusca('789101010')">
-                💊 Ver Disponibilidade (Dipirona)
-            </button>
+            <button class="btn-action" onclick="iniciarBusca('789101010')">💊 Buscar Dipirona</button>
+            <button class="btn-action" style="background-color: #6c757d;" onclick="iniciarBusca('789202020')">💊 Buscar Tylenol</button>
             
-            <button class="btn-action" style="background-color: #6c757d;" onclick="iniciarBusca('789202020')">
-                💊 Ver Disponibilidade (Tylenol)
-            </button>
-
-            <h4 style="margin-top: 20px;">Farmácias Próximas:</h4>
-            <div id="resultados">
-                <p style="text-align:center; color:#999;">Clique acima para buscar.</p>
-            </div>
+            <div id="resultados"><p style="text-align:center; color:#999;">Clique para buscar.</p></div>
         </div>
     </div>
 
     <script>
-        // LINK DA SUA API NO RENDER
         const API_BASE = "https://api-farma-hub.onrender.com"; 
 
         function iniciarBusca(ean) {
             const divResultados = document.getElementById('resultados');
-            const avisoSimulacao = document.getElementById('aviso-simulacao');
+            divResultados.innerHTML = '<p style="text-align:center;">🔍 Buscando...</p>';
             
-            divResultados.innerHTML = '<p style="text-align:center;">📡 Obtendo localização...</p>';
-            avisoSimulacao.style.display = 'none'; // Esconde aviso anterior
-
-            // Tenta pegar GPS Real
-            if (!navigator.geolocation) {
-                usarSimulacao(ean);
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    // SUCESSO NO GPS
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    fazerRequisicao(ean, lat, lon);
-                },
-                (error) => {
-                    // FALHA NO GPS (Seu caso no notebook)
-                    usarSimulacao(ean);
-                },
-                { timeout: 5000 }
-            );
-        }
-
-        function usarSimulacao(ean) {
-            const avisoSimulacao = document.getElementById('aviso-simulacao');
-            avisoSimulacao.style.display = 'block'; // Mostra o aviso azul
-
-            // Coordenadas do Farol da Barra, Salvador
-            const latFake = -13.0101;
-            const lonFake = -38.5323;
-
-            fazerRequisicao(ean, latFake, lonFake);
+            // Ativa aviso visual de simulação
+            document.getElementById('aviso-simulacao').style.display = 'block';
+            
+            // Força coordenadas de Salvador (Barra) para teste
+            fazerRequisicao(ean, -13.0101, -38.5323); 
         }
 
         async function fazerRequisicao(ean, lat, lon) {
             const divResultados = document.getElementById('resultados');
-            
             try {
-                let url = `${API_BASE}/search?ean=${ean}`;
-                if (lat && lon) {
-                    url += `&lat=${lat}&lon=${lon}`;
-                }
-
-                divResultados.innerHTML = '<p style="text-align:center;">🔍 Consultando Farmácias...</p>';
-
-                const response = await fetch(url);
+                const response = await fetch(`${API_BASE}/search?ean=${ean}&lat=${lat}&lon=${lon}`);
                 const data = await response.json();
-
                 divResultados.innerHTML = '';
 
                 if (data.length === 0) {
-                    divResultados.innerHTML = '<p style="text-align:center; color:red;">❌ Nenhuma farmácia tem estoque.</p>';
+                    divResultados.innerHTML = '<p style="text-align:center;">❌ Nenhum estoque encontrado.</p>'; 
                     return;
                 }
 
                 data.forEach(item => {
-                    let distanciaTexto = "";
-                    let tempoTexto = "";
+                    // Proteção: Se a API antiga não mandar ID, usa 0
+                    const safeId = item.id || 0; 
                     
-                    if (item.distancia_txt && item.distancia_txt !== "0.0 km") {
-                        distanciaTexto = `<span class="distance-info">📍 ${item.distancia_txt} de você</span>`;
-                        tempoTexto = `<small>Entrega: ${item.tempo}</small>`;
-                    } else if (item.distancia_txt === "0.0 km") {
-                         distanciaTexto = `<span class="distance-info" style="color:green;">📍 Você está aqui!</span>`;
-                         tempoTexto = `<small>Retirada Imediata</small>`;
-                    } else {
-                        distanciaTexto = `<span class="distance-info" style="color:orange;">📍 Distância não calculada</span>`;
-                        tempoTexto = `<small>Entrega: A consultar</small>`;
-                    }
+                    const zapLink = `https://wa.me/5571999999999?text=Quero reservar o item ${ean}`;
 
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    card.innerHTML = `
-                        // Link do WhatsApp (Gera mensagem automática)
-                    // Nota: Na vida real, o telefone viria do banco de dados. 
-                    // Aqui vou por um fake para teste.
-                    const zapLink = `https://wa.me/5571999999999?text=Olá, vi o produto ${ean} no Dr. Consulta por ${item.preco}`;
-
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    card.innerHTML = `
+                    // Cria o HTML do cartão
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    div.innerHTML = `
                         <div>
                             <h3>${item.farmacia}</h3>
                             <p>${item.endereco}</p>
-                            <span class="badge bg-green">Estoque: ${item.estoque} un</span>
-                            ${distanciaTexto}
+                            <span class="badge">Estoque: ${item.estoque}</span><br>
+                            <small>📍 ${item.distancia_txt || '?? km'}</small>
                         </div>
                         <div style="text-align:right;">
                             <div class="price">${item.preco}</div>
-                            ${tempoTexto}
-                            
-                            <a href="${zapLink}" target="_blank" 
-                               onclick="registrarClique('${item.farmacia}', '${ean}')"
-                               style="display:inline-block; margin-top:5px; background:#25D366; color:white; padding:5px 10px; text-decoration:none; font-size:12px; border-radius:4px;">
+                            <a href="${zapLink}" target="_blank" class="btn-zap" 
+                               onclick="registrarClique(${safeId}, '${item.farmacia}', '${ean}')">
                                📱 Reservar
                             </a>
                         </div>
                     `;
-                    divResultados.appendChild(card);
+                    divResultados.appendChild(div);
                 });
-
-            } catch (error) {
+            } catch (error) { 
                 console.error(error);
-                divResultados.innerHTML = '<p style="text-align:center; color:red;">Erro de conexão com a Nuvem.</p>';
+                divResultados.innerHTML = '<p style="text-align:center; color:red;">Erro na conexão com a API.</p>'; 
             }
         }
-        function registrarClique(nomeFarma, ean) {
-            // Manda um aviso silencioso para sua API
+
+        function registrarClique(idDinamico, nomeFarma, ean) {
+            console.log(`Enviando lead: Farmácia ID ${idDinamico} (${nomeFarma})`);
+            
+            // Envia o dado para a nuvem
             fetch(`${API_BASE}/log_action`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    pharmacy_id: 2, // Na versão final, isso vem dinâmico
+                    pharmacy_id: idDinamico, 
                     ean: ean,
                     action: "clique_whatsapp"
                 })
-            });
-            console.log("Clique registrado para " + nomeFarma);
+            }).catch(err => console.error("Erro ao logar:", err));
         }
     </script>
 </body>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Parceiro - FarmaHub</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1 { color: #333; }
+        h2 { color: #555; font-size: 18px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        .big-number { font-size: 48px; font-weight: bold; color: #28a745; margin: 10px 0; }
+        .label { color: #777; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; color: #555; }
+        tr:hover { background-color: #f1f1f1; }
+        
+        .status-ok { color: green; font-weight: bold; }
+        .refresh-btn { float: right; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .refresh-btn:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <button class="refresh-btn" onclick="carregarDados()">🔄 Atualizar</button>
+        <h1>Painel de Performance</h1>
+        <p>Acompanhe em tempo real os clientes enviados para sua farmácia.</p>
+
+        <div class="card" style="text-align: center;">
+            <span class="label">Total de Clientes Enviados (Mês)</span>
+            <div id="total-clientes" class="big-number">--</div>
+            <small style="color: #888;">Cliques no botão "Reservar"</small>
+        </div>
+
+        <div class="card">
+            <h2>🕵️ Auditoria de Tráfego (Últimos 10)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Horário</th>
+                        <th>Farmácia</th>
+                        <th>Produto</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-logs">
+                    <tr><td colspan="4">Carregando dados...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://api-farma-hub.onrender.com/dashboard";
+
+        async function carregarDados() {
+            const divTotal = document.getElementById('total-clientes');
+            const tbody = document.getElementById('tabela-logs');
+
+            divTotal.innerText = "...";
+            
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+
+                // 1. Atualiza o Número Grande (Pega o total da Pelourinho ou soma tudo)
+                // Se tiver mais de uma farmácia, soma os valores do resumo
+                let total = 0;
+                for (let key in data.resumo_mensal) {
+                    total += data.resumo_mensal[key];
+                }
+                divTotal.innerText = total;
+
+                // 2. Preenche a Tabela
+                tbody.innerHTML = "";
+                data.auditoria_ultimos_cliques.forEach(linhaTexto => {
+                    // O texto vem assim: "[Data] Farmacia - EAN (acao)"
+                    // Vamos limpar um pouco para ficar bonito na tabela
+                    
+                    // Extrai data (está entre colchetes)
+                    const dataHora = linhaTexto.substring(1, 20);
+                    // O resto do texto
+                    const resto = linhaTexto.substring(22);
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${dataHora}</td>
+                        <td>${resto}</td> 
+                        <td><span class="status-ok">WhatsApp</span></td>
+                        <td>Enviado ✅</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (error) {
+                console.error(error);
+                divTotal.innerText = "Erro";
+                tbody.innerHTML = "<tr><td colspan='4' style='color:red'>Erro ao conectar no servidor.</td></tr>";
+            }
+        }
+
+        // Carrega assim que abrir a tela
+        carregarDados();
+    </script>
+</body>
+</html>
