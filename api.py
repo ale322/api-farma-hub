@@ -1,39 +1,33 @@
 from flask import Flask, request, jsonify
-import sqlite3
 from flask_cors import CORS
-import math  # <--- NOVA IMPORTAÇÃO
+import sqlite3
+import math
 
 app = Flask(__name__)
-CORS(app)
-DB_NAME = "farma_hub.db"
-
-# --- FUNÇÃO MATEMÁTICA NOVA (Fórmula de Haversine) ---
-def calcular_distancia(lat1, lon1, lat2, lon2):
-    # Raio da Terra em km
-    R = 6371.0
-    
-    # Converte graus para radianos
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    
-    a = math.sin(dlat / 2)**2 + \
-        math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
-        math.sin(dlon / 2)**2
-    
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    
-    return R * c # Retorna distância em KM
+CORS(app)  # Permite que o site no GitHub acesse esta API
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect('farma_hub.db')
     conn.row_factory = sqlite3.Row
     return conn
 
-@app.route('/')
-def index():
-    return jsonify({"status": "online", "message": "API FarmaHub com Geolocalização!"})
+# Função auxiliar para calcular distância (Fórmula de Haversine)
+def calcular_distancia(lat1, lon1, lat2, lon2):
+    R = 6371  # Raio da Terra em km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat/2) * math.sin(dlat/2) + \
+        math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
+        math.sin(dlon/2) * math.sin(dlon/2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c
 
-# --- ROTA DE BUSCA ATUALIZADA ---
+# --- ROTA 1: Status (Para checar se está online) ---
+@app.route('/')
+def home():
+    return jsonify({"status": "online", "message": "API FarmaHub Operando 24h"})
+
+# --- ROTA 2: Busca de Produtos (Com GPS e ID da Farmácia) ---
 @app.route('/search', methods=['GET'])
 def search_product():
     ean_buscado = request.args.get('ean')
@@ -45,7 +39,7 @@ def search_product():
 
     conn = get_db_connection()
     
-    # ATENÇÃO AQUI: Adicionei 'ph.id' na primeira linha do SELECT
+    # Busca produtos com estoque > 0
     query = '''
         SELECT 
             ph.id, 
@@ -65,17 +59,18 @@ def search_product():
     resultados = []
     for row in rows:
         distancia_km = 0
-        tempo_estimado = "Calcular..."
+        tempo_estimado = "A calcular"
         
+        # Se o usuário mandou GPS, calcula a distância real
         if user_lat is not None and user_lon is not None:
             farma_lat = row['latitude']
             farma_lon = row['longitude']
             distancia_km = calcular_distancia(user_lat, user_lon, farma_lat, farma_lon)
-            tempo_minutos = int((distancia_km / 20) * 60) + 10
+            tempo_minutos = int((distancia_km / 20) * 60) + 10 # 20km/h média motoboy + 10min preparo
             tempo_estimado = f"{tempo_minutos} min"
 
         resultados.append({
-            "id": row['id'],  # <--- NOVA LINHA FUNDAMENTAL
+            "id": row['id'],  # ID importante para o monitoramento
             "farmacia": row['farmacia'],
             "endereco": row['address'],
             "estoque": row['quantidade'],
@@ -85,47 +80,16 @@ def search_product():
             "tempo": tempo_estimado
         })
 
+    # Ordena: Mais perto primeiro
     if user_lat:
         resultados.sort(key=lambda x: x['distancia_raw'])
 
     return jsonify(resultados)
 
-@app.route('/sync', methods=['POST'])
-def sync_stock():
-    dados = request.get_json()
-    api_key = request.headers.get('X-API-KEY')
-    
-    conn = get_db_connection()
-    farmacia = conn.execute('SELECT id FROM pharmacies WHERE api_key = ?', (api_key,)).fetchone()
-    
-    if not farmacia:
-        conn.close()
-        return jsonify({"error": "Acesso negado."}), 401
-    
-    pharmacy_id = farmacia['id']
-
-    for item in dados.get('estoque', []):
-        ean = item['ean']
-        qty = item['qty']
-        price = item['price']
-        
-        conn.execute('''
-            INSERT INTO stock (pharmacy_id, product_ean, qty, price, last_updated) 
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(pharmacy_id, product_ean) 
-            DO UPDATE SET qty=excluded.qty, price=excluded.price, last_updated=CURRENT_TIMESTAMP
-        ''', (pharmacy_id, ean, qty, price))
-    
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"status": "sucesso", "message": "Estoque atualizado"})
-    # --- ROTA DE REGISTRO (O App chama essa rota escondido) ---
+# --- ROTA 3: Monitoramento de Vendas (Espião) ---
 @app.route('/log_action', methods=['POST'])
 def log_action():
     dados = request.get_json()
-    # Espera receber: { "pharmacy_id": 1, "ean": "...", "action": "clique_zap" }
-    
     farma_id = dados.get('pharmacy_id')
     ean = dados.get('ean')
     acao = dados.get('action')
@@ -137,12 +101,12 @@ def log_action():
     conn.close()
     return jsonify({"status": "logged"})
 
-# --- ROTA DE RELATÓRIO (Só você acessa para ver os números) ---
+# --- ROTA 4: Painel do Dono (Dashboard) ---
 @app.route('/dashboard', methods=['GET'])
 def dashboard():
     conn = get_db_connection()
     
-    # 1. Totais por Farmácia
+    # Totais por farmácia
     query_totais = '''
         SELECT ph.name, COUNT(l.id) as total
         FROM leads l
@@ -151,7 +115,7 @@ def dashboard():
     '''
     rows_totais = conn.execute(query_totais).fetchall()
     
-    # 2. Últimas 10 ações (A PROVA REAL)
+    # Últimas 10 ações (Auditoria)
     query_detalhe = '''
         SELECT ph.name, l.product_ean, l.action_type, l.created_at
         FROM leads l
@@ -162,7 +126,6 @@ def dashboard():
     rows_detalhe = conn.execute(query_detalhe).fetchall()
     conn.close()
     
-    # Monta a resposta bonita
     totais = {row['name']: row['total'] for row in rows_totais}
     detalhes = []
     for row in rows_detalhe:
@@ -173,5 +136,35 @@ def dashboard():
         "auditoria_ultimos_cliques": detalhes
     })
 
+# --- ROTA 5: Atualização Automática de Estoque (O Agente chama aqui) ---
+@app.route('/update_stock', methods=['POST'])
+def update_stock():
+    dados = request.get_json()
+    farma_id = dados.get('pharmacy_id')
+    lista_produtos = dados.get('products')
+    
+    if not farma_id or not lista_produtos:
+        return jsonify({"error": "Dados inválidos"}), 400
+
+    conn = get_db_connection()
+    try:
+        # 1. Limpa estoque antigo dessa filial
+        conn.execute('DELETE FROM stock WHERE pharmacy_id = ?', (farma_id,))
+        
+        # 2. Insere estoque novo
+        for item in lista_produtos:
+            conn.execute('''
+                INSERT INTO stock (pharmacy_id, product_ean, qty, price) 
+                VALUES (?, ?, ?, ?)
+            ''', (farma_id, item['ean'], item['qty'], item['price']))
+            
+        conn.commit()
+        return jsonify({"status": "sucesso", "msg": f"{len(lista_produtos)} itens atualizados"})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
