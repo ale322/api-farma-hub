@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeleMedicina - Prescrição</title>
+    <title>Dr. Consulta App</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
         .phone-frame {
@@ -29,6 +29,7 @@
         .bg-green { background-color: #28a745; }
         
         .distance-info { font-size: 11px; color: #666; margin-top: 5px; display: block; }
+        .simulacao-msg { font-size: 11px; color: blue; text-align: center; margin-bottom: 10px; background: #e7f3ff; padding: 5px; border-radius: 4px; display: none; }
     </style>
 </head>
 <body>
@@ -42,6 +43,10 @@
         <div class="content">
             <div class="doctor-msg">
                 "Olá! Prescrevi <b>Dipirona 500mg</b> para sua dor de cabeça. Clique abaixo para ver onde comprar."
+            </div>
+
+            <div id="aviso-simulacao" class="simulacao-msg">
+                ⚠️ GPS indisponível no PC. Simulando localização em Salvador (Barra).
             </div>
 
             <button class="btn-action" onclick="iniciarBusca('789101010')">
@@ -60,47 +65,58 @@
     </div>
 
     <script>
-        // Mude aqui para o seu link do Render se já tiver subido a API nova
-        // Se estiver testando local, use http://localhost:5000
+        // LINK DA SUA API NO RENDER
         const API_BASE = "https://api-farma-hub.onrender.com"; 
 
         function iniciarBusca(ean) {
             const divResultados = document.getElementById('resultados');
-            divResultados.innerHTML = '<p style="text-align:center;">📡 Pedindo sua localização...</p>';
+            const avisoSimulacao = document.getElementById('aviso-simulacao');
+            
+            divResultados.innerHTML = '<p style="text-align:center;">📡 Obtendo localização...</p>';
+            avisoSimulacao.style.display = 'none'; // Esconde aviso anterior
 
-            // 1. Tenta pegar o GPS do navegador
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        // Sucesso: temos GPS
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        fazerRequisicao(ean, lat, lon);
-                    },
-                    (error) => {
-                        // Erro ou Negado: busca sem GPS
-                        console.warn("GPS negado ou erro:", error);
-                        divResultados.innerHTML = '<p style="text-align:center; color:orange;">⚠️ Localização não permitida. Buscando geral...</p>';
-                        fazerRequisicao(ean, null, null);
-                    }
-                );
-            } else {
-                // Navegador muito antigo
-                fazerRequisicao(ean, null, null);
+            // Tenta pegar GPS Real
+            if (!navigator.geolocation) {
+                usarSimulacao(ean);
+                return;
             }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    // SUCESSO NO GPS
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    fazerRequisicao(ean, lat, lon);
+                },
+                (error) => {
+                    // FALHA NO GPS (Seu caso no notebook)
+                    usarSimulacao(ean);
+                },
+                { timeout: 5000 }
+            );
+        }
+
+        function usarSimulacao(ean) {
+            const avisoSimulacao = document.getElementById('aviso-simulacao');
+            avisoSimulacao.style.display = 'block'; // Mostra o aviso azul
+
+            // Coordenadas do Farol da Barra, Salvador
+            const latFake = -13.0101;
+            const lonFake = -38.5323;
+
+            fazerRequisicao(ean, latFake, lonFake);
         }
 
         async function fazerRequisicao(ean, lat, lon) {
             const divResultados = document.getElementById('resultados');
             
             try {
-                // Monta a URL (com ou sem coordenadas)
                 let url = `${API_BASE}/search?ean=${ean}`;
                 if (lat && lon) {
                     url += `&lat=${lat}&lon=${lon}`;
                 }
 
-                divResultados.innerHTML = '<p style="text-align:center;">🔍 Consultando farmácias...</p>';
+                divResultados.innerHTML = '<p style="text-align:center;">🔍 Consultando Farmácias...</p>';
 
                 const response = await fetch(url);
                 const data = await response.json();
@@ -113,17 +129,27 @@
                 }
 
                 data.forEach(item => {
-                    // Se não tiver cálculo de distância, mostra texto padrão
                     let distanciaTexto = "";
                     let tempoTexto = "";
                     
                     if (item.distancia_txt && item.distancia_txt !== "0.0 km") {
                         distanciaTexto = `<span class="distance-info">📍 ${item.distancia_txt} de você</span>`;
                         tempoTexto = `<small>Entrega: ${item.tempo}</small>`;
+                    } else if (item.distancia_txt === "0.0 km") {
+                         distanciaTexto = `<span class="distance-info" style="color:green;">📍 Você está aqui!</span>`;
+                         tempoTexto = `<small>Retirada Imediata</small>`;
                     } else {
-                        distanciaTexto = `<span class="distance-info">📍 Distância desconhecida</span>`;
+                        distanciaTexto = `<span class="distance-info" style="color:orange;">📍 Distância não calculada</span>`;
                         tempoTexto = `<small>Entrega: A consultar</small>`;
                     }
+
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        // Link do WhatsApp (Gera mensagem automática)
+                    // Nota: Na vida real, o telefone viria do banco de dados. 
+                    // Aqui vou por um fake para teste.
+                    const zapLink = `https://wa.me/5571999999999?text=Olá, vi o produto ${ean} no Dr. Consulta por ${item.preco}`;
 
                     const card = document.createElement('div');
                     card.className = 'card';
@@ -137,6 +163,12 @@
                         <div style="text-align:right;">
                             <div class="price">${item.preco}</div>
                             ${tempoTexto}
+                            
+                            <a href="${zapLink}" target="_blank" 
+                               onclick="registrarClique('${item.farmacia}', '${ean}')"
+                               style="display:inline-block; margin-top:5px; background:#25D366; color:white; padding:5px 10px; text-decoration:none; font-size:12px; border-radius:4px;">
+                               📱 Reservar
+                            </a>
                         </div>
                     `;
                     divResultados.appendChild(card);
@@ -146,6 +178,19 @@
                 console.error(error);
                 divResultados.innerHTML = '<p style="text-align:center; color:red;">Erro de conexão com a Nuvem.</p>';
             }
+        }
+        function registrarClique(nomeFarma, ean) {
+            // Manda um aviso silencioso para sua API
+            fetch(`${API_BASE}/log_action`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    pharmacy_id: 2, // Na versão final, isso vem dinâmico
+                    ean: ean,
+                    action: "clique_whatsapp"
+                })
+            });
+            console.log("Clique registrado para " + nomeFarma);
         }
     </script>
 </body>

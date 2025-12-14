@@ -128,6 +128,58 @@ def sync_stock():
     conn.close()
     
     return jsonify({"status": "sucesso", "message": "Estoque atualizado"})
+    # --- ROTA DE REGISTRO (O App chama essa rota escondido) ---
+@app.route('/log_action', methods=['POST'])
+def log_action():
+    dados = request.get_json()
+    # Espera receber: { "pharmacy_id": 1, "ean": "...", "action": "clique_zap" }
+    
+    farma_id = dados.get('pharmacy_id')
+    ean = dados.get('ean')
+    acao = dados.get('action')
+    
+    conn = get_db_connection()
+    conn.execute('INSERT INTO leads (pharmacy_id, product_ean, action_type) VALUES (?, ?, ?)', 
+                 (farma_id, ean, acao))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "logged"})
+
+# --- ROTA DE RELATÓRIO (Só você acessa para ver os números) ---
+@app.route('/dashboard', methods=['GET'])
+def dashboard():
+    conn = get_db_connection()
+    
+    # 1. Totais por Farmácia
+    query_totais = '''
+        SELECT ph.name, COUNT(l.id) as total
+        FROM leads l
+        JOIN pharmacies ph ON l.pharmacy_id = ph.id
+        GROUP BY ph.name
+    '''
+    rows_totais = conn.execute(query_totais).fetchall()
+    
+    # 2. Últimas 10 ações (A PROVA REAL)
+    query_detalhe = '''
+        SELECT ph.name, l.product_ean, l.action_type, l.created_at
+        FROM leads l
+        JOIN pharmacies ph ON l.pharmacy_id = ph.id
+        ORDER BY l.created_at DESC
+        LIMIT 10
+    '''
+    rows_detalhe = conn.execute(query_detalhe).fetchall()
+    conn.close()
+    
+    # Monta a resposta bonita
+    totais = {row['name']: row['total'] for row in rows_totais}
+    detalhes = []
+    for row in rows_detalhe:
+        detalhes.append(f"[{row['created_at']}] {row['name']} - {row['product_ean']} ({row['action_type']})")
+        
+    return jsonify({
+        "resumo_mensal": totais,
+        "auditoria_ultimos_cliques": detalhes
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
