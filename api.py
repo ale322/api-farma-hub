@@ -37,8 +37,6 @@ def index():
 @app.route('/search', methods=['GET'])
 def search_product():
     ean_buscado = request.args.get('ean')
-    
-    # Recebe a localização do usuário (pode vir vazia se ele negar)
     user_lat = request.args.get('lat', type=float)
     user_lon = request.args.get('lon', type=float)
     
@@ -47,9 +45,10 @@ def search_product():
 
     conn = get_db_connection()
     
-    # QUERY ATUALIZADA: Agora buscamos latitude e longitude da farmácia
+    # ATENÇÃO AQUI: Adicionei 'ph.id' na primeira linha do SELECT
     query = '''
         SELECT 
+            ph.id, 
             ph.name as farmacia, 
             ph.address, 
             ph.latitude,
@@ -68,31 +67,24 @@ def search_product():
         distancia_km = 0
         tempo_estimado = "Calcular..."
         
-        # Só calcula se o usuário mandou a posição dele
         if user_lat is not None and user_lon is not None:
-            # Pega posição da farmácia do banco
             farma_lat = row['latitude']
             farma_lon = row['longitude']
-            
-            # Faz a mágica matemática
             distancia_km = calcular_distancia(user_lat, user_lon, farma_lat, farma_lon)
-            
-            # Lógica de Motoboy: 
-            # Velocidade média de 20km/h na cidade + 10 min para separar o pedido
             tempo_minutos = int((distancia_km / 20) * 60) + 10
             tempo_estimado = f"{tempo_minutos} min"
 
         resultados.append({
+            "id": row['id'],  # <--- NOVA LINHA FUNDAMENTAL
             "farmacia": row['farmacia'],
             "endereco": row['address'],
             "estoque": row['quantidade'],
             "preco": f"R$ {row['preco']:.2f}",
-            "distancia_raw": distancia_km, # Usado só para ordenar
-            "distancia_txt": f"{distancia_km:.1f} km", # Usado para mostrar na tela
+            "distancia_raw": distancia_km,
+            "distancia_txt": f"{distancia_km:.1f} km",
             "tempo": tempo_estimado
         })
 
-    # ORDENAÇÃO: Se tiver distância, mostra o mais perto primeiro
     if user_lat:
         resultados.sort(key=lambda x: x['distancia_raw'])
 
