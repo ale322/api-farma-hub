@@ -70,7 +70,7 @@ def search_product():
             tempo_estimado = f"{tempo_minutos} min"
 
         resultados.append({
-            "id": row['id'],  # ID importante para o monitoramento
+            "id": row['id'],
             "farmacia": row['farmacia'],
             "endereco": row['address'],
             "estoque": row['quantidade'],
@@ -95,13 +95,14 @@ def log_action():
     acao = dados.get('action')
     
     conn = get_db_connection()
+    # Grava o horário UTC padrão do servidor
     conn.execute('INSERT INTO leads (pharmacy_id, product_ean, action_type) VALUES (?, ?, ?)', 
                  (farma_id, ean, acao))
     conn.commit()
     conn.close()
     return jsonify({"status": "logged"})
 
-# --- ROTA 4: Painel do Dono (Dashboard) ---
+# --- ROTA 4: Painel do Dono (Dashboard - CORRIGIDO HORA) ---
 @app.route('/dashboard', methods=['GET'])
 def dashboard():
     conn = get_db_connection()
@@ -115,9 +116,10 @@ def dashboard():
     '''
     rows_totais = conn.execute(query_totais).fetchall()
     
-    # Últimas 10 ações (Auditoria)
+    # Últimas 10 ações (Auditoria com ajuste de Fuso -3h)
+    # A função datetime(..., '-03:00') força o SQLite a subtrair 3 horas
     query_detalhe = '''
-        SELECT ph.name, l.product_ean, l.action_type, l.created_at
+        SELECT ph.name, l.product_ean, l.action_type, datetime(l.created_at, '-03:00') as created_at
         FROM leads l
         JOIN pharmacies ph ON l.pharmacy_id = ph.id
         ORDER BY l.created_at DESC
@@ -136,7 +138,7 @@ def dashboard():
         "auditoria_ultimos_cliques": detalhes
     })
 
-# --- ROTA 5: Atualização Automática de Estoque (O Agente chama aqui) ---
+# --- ROTA 5: Atualização Automática de Estoque ---
 @app.route('/update_stock', methods=['POST'])
 def update_stock():
     dados = request.get_json()
@@ -148,10 +150,7 @@ def update_stock():
 
     conn = get_db_connection()
     try:
-        # 1. Limpa estoque antigo dessa filial
         conn.execute('DELETE FROM stock WHERE pharmacy_id = ?', (farma_id,))
-        
-        # 2. Insere estoque novo
         for item in lista_produtos:
             conn.execute('''
                 INSERT INTO stock (pharmacy_id, product_ean, qty, price) 
