@@ -2,114 +2,250 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dr. Consulta App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FarmaBusca</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
-        .phone-frame { max-width: 400px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); overflow: hidden; min-height: 600px; }
-        .header { background-color: #007bff; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; }
-        .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .price { font-weight: bold; color: #007bff; font-size: 18px; }
-        .btn-zap { display:inline-block; margin-top:5px; background:#25D366; color:white; padding:8px 12px; text-decoration:none; font-size:13px; border-radius:4px; font-weight:bold; cursor: pointer; }
+        /* --- CSS Reset & Base --- */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #F3F4F6; /* Cinza claro moderno */
+            margin: 0; 
+            padding: 0; 
+            color: #1F2937; /* Cinza escuro para texto */
+            padding-bottom: 40px;
+        }
+
+        /* --- Cabeçalho Fixo --- */
+        .app-header {
+            background: #FFFFFF;
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .brand { 
+            font-size: 20px; 
+            font-weight: 700; 
+            color: #2563EB; /* Azul profissional */
+            display: flex; align-items: center; gap: 8px;
+        }
+        .status-badge {
+            font-size: 11px; font-weight: 500; color: #059669; background: #D1FAE5;
+            padding: 4px 8px; border-radius: 12px; display: flex; align-items: center; gap: 4px;
+        }
+        .status-dot { width: 6px; height: 6px; background-color: #059669; border-radius: 50%; }
+
+        /* --- Área de Conteúdo --- */
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+
+        /* --- Avisos --- */
+        .simulacao-msg { 
+            font-size: 13px; color: #2563EB; background: #DBEAFE; 
+            padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; 
+            display: none; text-align: center; font-weight: 500;
+        }
+        .error-msg { color: #DC2626; text-align: center; font-size: 14px; margin: 20px 0; }
+
+        /* --- Barra de Busca e Filtros --- */
+        .search-hero { margin-bottom: 24px; }
+        .fake-search-bar {
+            background: white; border: 1px solid #E5E7EB; border-radius: 12px;
+            padding: 14px 16px; display: flex; align-items: center; gap: 10px;
+            color: #9CA3AF; font-size: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .quick-filters {
+            display: flex; gap: 10px; margin-top: 12px; overflow-x: auto; padding-bottom: 5px;
+            -ms-overflow-style: none; scrollbar-width: none;
+        }
+        .quick-filters::-webkit-scrollbar { display: none; }
+        
+        .filter-pill {
+            background: #FFFFFF; border: 1px solid #E5E7EB; color: #374151;
+            padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500;
+            white-space: nowrap; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .filter-pill.active { background: #2563EB; color: white; border-color: #2563EB; }
+        .filter-pill:active { transform: scale(0.96); }
+
+        /* --- Cartões de Resultado --- */
+        .card { 
+            background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #F3F4F6;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .farma-name { font-size: 16px; font-weight: 700; margin: 0 0 4px 0; color: #111827; }
+        .farma-address { font-size: 13px; color: #6B7280; display: flex; align-items: center; gap: 4px; }
+        
+        .price-tag { font-size: 22px; font-weight: 800; color: #059669; }
+        
+        .card-footer { 
+            display: flex; justify-content: space-between; align-items: center; 
+            border-top: 1px solid #F3F4F6; padding-top: 12px;
+        }
+        .stock-badge { 
+            font-size: 12px; font-weight: 600; color: #059669; background: #ECFDF5;
+            padding: 4px 10px; border-radius: 6px; display: flex; align-items: center; gap: 4px;
+        }
+        
+        .btn-zap { 
+            background: #25D366; color:white; padding: 10px 20px; 
+            text-decoration:none; font-size:14px; border-radius: 8px; font-weight: 700; 
+            display: flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.2s;
+            box-shadow: 0 2px 5px rgba(37, 211, 102, 0.3);
+        }
         .btn-zap:hover { background-color: #1ebc57; }
-        .badge { font-size: 10px; padding: 3px 6px; border-radius: 4px; color: white; background-color: #28a745; }
-        .simulacao-msg { font-size: 11px; color: blue; text-align: center; margin-bottom: 10px; background: #e7f3ff; padding: 5px; display: none; }
-        .btn-action { width: 100%; padding: 15px; background-color: #28a745; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-bottom: 20px; }
-        .error-msg { color: red; text-align: center; font-size: 12px; display: none; }
+        .btn-zap:active { transform: translateY(1px); }
+
+        /* --- Estados de Loading/Vazio --- */
+        .loading-state, .empty-state {
+            text-align: center; padding: 40px 20px; color: #6B7280;
+        }
+        .empty-state h3 { color: #374151; margin-bottom: 8px; }
+        
+        /* Ícones SVG Inline */
+        .icon-sm { width: 16px; height: 16px; }
+        .icon-md { width: 20px; height: 20px; }
     </style>
 </head>
 <body>
 
-    <div class="phone-frame">
-        <div class="header">
-            <h2>Dr. Consulta App</h2>
-            <small>Monitoramento Ativo</small>
+    <header class="app-header">
+        <div class="brand">
+            <svg class="icon-md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3ZM10 17H8V13H4V11H8V7H10V11H14V13H10V17ZM16 17H15V7H16V17Z"/></svg>
+            FarmaBusca
+        </div>
+        <div class="status-badge">
+            <span class="status-dot"></span> Online
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="aviso-simulacao" class="simulacao-msg">📍 Modo Teste: Usando localização Salvador (Barra).</div>
+        <div id="erro-global" class="error-msg"></div>
+
+        <div class="search-hero">
+            <div class="fake-search-bar">
+                <svg class="icon-md" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <span>O que você precisa hoje?</span>
+            </div>
+            
+            <div class="quick-filters">
+                <button class="filter-pill active" onclick="iniciarBusca('789101010', this)">
+                    💊 Dipirona
+                </button>
+                <button class="filter-pill" onclick="iniciarBusca('789202020', this)">
+                    💊 Tylenol
+                </button>
+                 <button class="filter-pill" onclick="iniciarBusca('789303030', this)">
+                    💊 Dorflex
+                </button>
+            </div>
         </div>
 
-        <div class="content">
-            <div id="aviso-simulacao" class="simulacao-msg">⚠️ Modo Simulação: Localização Salvador.</div>
-            <div id="erro-global" class="error-msg"></div>
-
-            <button class="btn-action" onclick="iniciarBusca('789101010')">💊 Buscar Dipirona</button>
-            <button class="btn-action" style="background-color: #6c757d;" onclick="iniciarBusca('789202020')">💊 Buscar Tylenol</button>
-            
-            <div id="resultados"><p style="text-align:center; color:#999;">Clique para buscar.</p></div>
+        <div id="resultados">
+            <div class="loading-state">
+                <p>👆 Toque em um remédio acima para buscar.</p>
+            </div>
         </div>
     </div>
 
     <script>
         const API_BASE = "https://api-farma-hub.onrender.com"; 
 
-        function iniciarBusca(ean) {
+        function iniciarBusca(ean, elementoBotao) {
+            document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+            if(elementoBotao) elementoBotao.classList.add('active');
+
             const divResultados = document.getElementById('resultados');
-            divResultados.innerHTML = '<p style="text-align:center;">🔍 Buscando...</p>';
+            divResultados.innerHTML = `
+                <div class="loading-state" style="color: #2563EB;">
+                    <svg class="icon-md" style="animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <p style="margin-top:10px;">Buscando melhores preços...</p>
+                </div>
+            `;
             
-            // Ativa aviso visual de simulação
             document.getElementById('aviso-simulacao').style.display = 'block';
-            
-            // Força coordenadas de Salvador (Barra) para teste
             fazerRequisicao(ean, -13.0101, -38.5323); 
         }
 
         async function fazerRequisicao(ean, lat, lon) {
             const divResultados = document.getElementById('resultados');
             try {
-                const response = await fetch(`${API_BASE}/search?ean=${ean}&lat=${lat}&lon=${lon}`);
+                // --- TRUQUE ANTI-CACHE AQUI ---
+                // Adicionamos ?t=AGORA para o navegador achar que é um link novo
+                const timestamp = Date.now(); 
+                
+                const response = await fetch(`${API_BASE}/search?ean=${ean}&lat=${lat}&lon=${lon}&t=${timestamp}`);
                 const data = await response.json();
                 divResultados.innerHTML = '';
 
                 if (data.length === 0) {
-                    divResultados.innerHTML = '<p style="text-align:center;">❌ Nenhum estoque encontrado.</p>'; 
+                    divResultados.innerHTML = `
+                        <div class="empty-state">
+                           <h3>Nenhum resultado</h3>
+                           <p>Não encontramos este item nas farmácias próximas.</p>
+                        </div>`;
                     return;
                 }
 
                 data.forEach(item => {
-                    // Proteção: Se a API antiga não mandar ID, usa 0
                     const safeId = item.id || 0; 
-                    
-                    const zapLink = `https://wa.me/5571999999999?text=Quero reservar o item ${ean}`;
+                    const zapLink = `https://wa.me/5571999999999?text=Olá, gostaria de reservar o item ${ean} que vi no FarmaBusca por ${item.preco}.`;
 
-                    // Cria o HTML do cartão
-                    const div = document.createElement('div');
-                    div.className = 'card';
-                    div.innerHTML = `
-                        <div>
-                            <h3>${item.farmacia}</h3>
-                            <p>${item.endereco}</p>
-                            <span class="badge">Estoque: ${item.estoque}</span><br>
-                            <small>📍 ${item.distancia_txt || '?? km'}</small>
-                        </div>
-                        <div style="text-align:right;">
-                            <div class="price">${item.preco}</div>
-                            <a href="${zapLink}" target="_blank" class="btn-zap" 
-                               onclick="registrarClique(${safeId}, '${item.farmacia}', '${ean}')">
-                               📱 Reservar
-                            </a>
+                    divResultados.innerHTML += `
+                        <div class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h3 class="farma-name">${item.farmacia}</h3>
+                                    <p class="farma-address">
+                                        <svg class="icon-sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" /></svg>
+                                        ${item.distancia_txt} • ${item.endereco}
+                                    </p>
+                                </div>
+                                <div class="price-tag">${item.preco}</div>
+                            </div>
+
+                            <div class="card-footer">
+                                <div class="stock-badge">
+                                    <svg class="icon-sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" /></svg>
+                                    ${item.estoque} un. disponíveis
+                                </div>
+                                <a href="${zapLink}" target="_blank" class="btn-zap" 
+                                   onclick="registrarClique(${safeId}, '${item.farmacia}', '${ean}')">
+                                   <svg class="icon-md" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#ffffff"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                                   Pedir agora no Zap
+                                </a>
+                            </div>
                         </div>
                     `;
-                    divResultados.appendChild(div);
                 });
             } catch (error) { 
                 console.error(error);
-                divResultados.innerHTML = '<p style="text-align:center; color:red;">Erro na conexão com a API.</p>'; 
+                divResultados.innerHTML = '<div class="error-msg">Erro de conexão com o servidor. Tente novamente.</div>'; 
             }
         }
 
         function registrarClique(idDinamico, nomeFarma, ean) {
             console.log(`Enviando lead: Farmácia ID ${idDinamico} (${nomeFarma})`);
-            
-            // Envia o dado para a nuvem
             fetch(`${API_BASE}/log_action`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    pharmacy_id: idDinamico, 
-                    ean: ean,
-                    action: "clique_whatsapp"
-                })
+                body: JSON.stringify({ pharmacy_id: idDinamico, ean: ean, action: "clique_whatsapp" })
             }).catch(err => console.error("Erro ao logar:", err));
         }
     </script>
+    <style>
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
 </body>
 </html>
