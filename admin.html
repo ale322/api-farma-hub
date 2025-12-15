@@ -3,109 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel do Parceiro - FarmaHub</title>
+    <title>Painel FarmaHub - Ao Vivo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h1 { color: #333; }
-        h2 { color: #555; font-size: 18px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; margin: 0; padding: 20px; color: #1F2937; }
+        .container { max-width: 900px; margin: 0 auto; }
         
-        .big-number { font-size: 48px; font-weight: bold; color: #28a745; margin: 10px 0; }
-        .label { color: #777; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        /* Cabeçalho */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .brand { font-size: 24px; font-weight: 800; color: #2563EB; display: flex; align-items: center; gap: 10px; }
+        
+        /* Indicador de Ao Vivo */
+        .live-badge { 
+            background: #DEF7EC; color: #03543F; padding: 6px 12px; border-radius: 20px; 
+            font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; border: 1px solid #BCF0DA;
+        }
+        .live-dot { width: 8px; height: 8px; background: #0E9F6E; border-radius: 50%; animation: pulse 1.5s infinite; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background-color: #f8f9fa; color: #555; }
-        tr:hover { background-color: #f1f1f1; }
+        /* Cartões */
+        .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E5E7EB; }
         
-        .status-ok { color: green; font-weight: bold; }
-        .refresh-btn { float: right; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        .refresh-btn:hover { background: #0056b3; }
+        /* Destaque do Número */
+        .stat-label { font-size: 14px; color: #6B7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+        .big-number { font-size: 64px; font-weight: 800; color: #111827; margin: 10px 0; transition: color 0.3s; }
+        .big-number.updated { color: #059669; animation: bounce 0.5s; } /* Efeito quando muda */
+
+        /* Tabela */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { text-align: left; padding: 12px; color: #6B7280; font-size: 13px; font-weight: 600; border-bottom: 1px solid #E5E7EB; }
+        td { padding: 16px 12px; border-bottom: 1px solid #F3F4F6; font-size: 14px; color: #374151; }
+        tr:last-child td { border-bottom: none; }
+        
+        .badge-zap { 
+            background: #DEF7EC; color: #03543F; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; 
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+
+        /* Animações */
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <button class="refresh-btn" onclick="carregarDados()">🔄 Atualizar</button>
-        <h1>Painel de Performance</h1>
-        <p>Acompanhe em tempo real os clientes enviados para sua farmácia.</p>
-
-        <div class="card" style="text-align: center;">
-            <span class="label">Total de Clientes Enviados (Mês)</span>
-            <div id="total-clientes" class="big-number">--</div>
-            <small style="color: #888;">Cliques no botão "Reservar"</small>
+        <div class="header">
+            <div class="brand">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+                FarmaHub Admin
+            </div>
+            <div class="live-badge">
+                <span class="live-dot"></span> Ao Vivo
+            </div>
         </div>
 
-        <div class="card">
-            <h2>🕵️ Auditoria de Tráfego (Últimos 10)</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Horário</th>
-                        <th>Farmácia</th>
-                        <th>Produto</th>
-                        <th>Ação</th>
-                    </tr>
-                </thead>
-                <tbody id="tabela-logs">
-                    <tr><td colspan="4">Carregando dados...</td></tr>
-                </tbody>
-            </table>
+        <div class="grid">
+            <div class="card" style="text-align: center;">
+                <span class="stat-label">Leads Gerados (Mês)</span>
+                <div id="total-clientes" class="big-number">--</div>
+                <small style="color: #6B7280;">Cliques no botão "Reservar" direcionados para o WhatsApp</small>
+            </div>
+
+            <div class="card">
+                <h2 style="font-size: 18px; margin: 0 0 10px 0; color: #111827;">🕵️ Últimas Interações</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>HORÁRIO</th>
+                            <th>FARMÁCIA</th>
+                            <th>PRODUTO</th>
+                            <th>STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-logs">
+                        <tr><td colspan="4" style="text-align:center; color:#999;">Carregando dados...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <script>
         const API_URL = "https://api-farma-hub.onrender.com/dashboard";
+        let ultimoTotal = 0; // Para saber se o número mudou
 
         async function carregarDados() {
-            const divTotal = document.getElementById('total-clientes');
-            const tbody = document.getElementById('tabela-logs');
-
-            divTotal.innerText = "...";
-            
             try {
                 const response = await fetch(API_URL);
                 const data = await response.json();
 
-                // 1. Atualiza o Número Grande (Pega o total da Pelourinho ou soma tudo)
-                // Se tiver mais de uma farmácia, soma os valores do resumo
-                let total = 0;
+                // 1. Calcula o Total
+                let totalAtual = 0;
                 for (let key in data.resumo_mensal) {
-                    total += data.resumo_mensal[key];
+                    totalAtual += data.resumo_mensal[key];
                 }
-                divTotal.innerText = total;
 
-                // 2. Preenche a Tabela
+                // 2. Atualiza o Número na tela
+                const divTotal = document.getElementById('total-clientes');
+                divTotal.innerText = totalAtual;
+
+                // SE O NÚMERO MUDOU: Faz um efeito visual (Flash Verde)
+                if (totalAtual > ultimoTotal && ultimoTotal !== 0) {
+                    divTotal.classList.add('updated');
+                    setTimeout(() => divTotal.classList.remove('updated'), 1000); // Remove o efeito depois de 1s
+                }
+                ultimoTotal = totalAtual;
+
+                // 3. Preenche a Tabela
+                const tbody = document.getElementById('tabela-logs');
                 tbody.innerHTML = "";
-                data.auditoria_ultimos_cliques.forEach(linhaTexto => {
-                    // O texto vem assim: "[Data] Farmacia - EAN (acao)"
-                    // Vamos limpar um pouco para ficar bonito na tabela
+                
+                // Pega só os 5 primeiros para não ficar gigante
+                data.auditoria_ultimos_cliques.slice(0, 5).forEach(linhaTexto => {
+                    const dataHora = linhaTexto.substring(1, 20); // Pega a data [2025...]
                     
-                    // Extrai data (está entre colchetes)
-                    const dataHora = linhaTexto.substring(1, 20);
-                    // O resto do texto
-                    const resto = linhaTexto.substring(22);
+                    // Tratamento simples para separar nome e produto do texto bruto
+                    // Formato esperado: "[DATA] Farmacia - EAN (clique)"
+                    let textoLimpo = linhaTexto.substring(22).replace('(clique_whatsapp)', '');
+                    let partes = textoLimpo.split(' - ');
+                    let farmacia = partes[0] || "Desconhecida";
+                    let produto = partes[1] || "Item";
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td>${dataHora}</td>
-                        <td>${resto}</td> 
-                        <td><span class="status-ok">WhatsApp</span></td>
-                        <td>Enviado ✅</td>
+                        <td style="font-family:monospace; color:#6B7280;">${dataHora.split(' ')[1]}</td> <td style="font-weight:600;">${farmacia}</td>
+                        <td>${produto}</td> 
+                        <td><span class="badge-zap">Enviado ✅</span></td>
                     `;
                     tbody.appendChild(tr);
                 });
 
             } catch (error) {
-                console.error(error);
-                divTotal.innerText = "Erro";
-                tbody.innerHTML = "<tr><td colspan='4' style='color:red'>Erro ao conectar no servidor.</td></tr>";
+                console.error("Erro na atualização:", error);
             }
         }
 
-        // Carrega assim que abrir a tela
+        // --- O SEGREDO DA AUTOMAÇÃO ---
+        // 1. Carrega assim que abre
         carregarDados();
+        
+        // 2. Atualiza automaticamente a cada 5 segundos (5000ms)
+        setInterval(carregarDados, 5000);
     </script>
 </body>
 </html>
