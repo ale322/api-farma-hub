@@ -8,53 +8,47 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# --- CONFIGURAÇÃO DO BANCO (COLE SUA URL DO NEON AQUI) ---
-# Ex: "postgres://usuario:senha@endpoint.neon.tech/neondb?sslmode=require"
+# --- CONFIGURAÇÃO DO BANCO DE DADOS ---
+# ⚠️ IMPORTANTE: Cole sua URL do Neon aqui dentro das aspas
 DATABASE_URL = 'postgresql://neondb_owner:npg_MInKa3EA8CRF@ep-empty-water-aha5djpi-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
 
 def get_db_connection():
-    # Conecta no Neon (PostgreSQL)
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    return conn
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        return conn
+    except Exception as e:
+        print(f"❌ Erro de conexão com banco: {e}")
+        return None
 
-# --- CRIAÇÃO DAS TABELAS (Rodar uma vez) ---
+# --- INICIALIZAÇÃO DE TABELAS (Executa ao iniciar) ---
 def inicializar_banco():
     try:
         conn = get_db_connection()
+        if not conn: return
         cur = conn.cursor()
         
-        # Postgres usa SERIAL para auto-incremento, não INTEGER PRIMARY KEY AUTOINCREMENT
+        # Criação das tabelas se não existirem
         cur.execute('''
             CREATE TABLE IF NOT EXISTS pharmacies (
                 id SERIAL PRIMARY KEY, 
-                name TEXT, 
-                address TEXT, 
-                latitude REAL, 
-                longitude REAL
+                name TEXT, address TEXT, latitude REAL, longitude REAL
             );
         ''')
-        
         cur.execute('''
             CREATE TABLE IF NOT EXISTS stock (
                 id SERIAL PRIMARY KEY, 
-                pharmacy_id INTEGER, 
-                product_ean TEXT, 
-                qty INTEGER, 
-                price REAL
+                pharmacy_id INTEGER, product_ean TEXT, qty INTEGER, price REAL
             );
         ''')
-        
         cur.execute('''
             CREATE TABLE IF NOT EXISTS leads (
                 id SERIAL PRIMARY KEY, 
-                pharmacy_id INTEGER, 
-                product_ean TEXT, 
-                action_type TEXT, 
+                pharmacy_id INTEGER, product_ean TEXT, action_type TEXT, 
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         ''')
         
-        # Cria a farmácia padrão se não existir
+        # Garante que a farmácia padrão existe
         cur.execute("SELECT id FROM pharmacies WHERE id = 2")
         if not cur.fetchone():
             cur.execute("""
@@ -65,30 +59,31 @@ def inicializar_banco():
         conn.commit()
         cur.close()
         conn.close()
-        print("✅ Banco de Dados Neon Inicializado com Sucesso!")
+        print("✅ Banco de Dados Neon Inicializado!")
     except Exception as e:
         print(f"❌ Erro ao iniciar banco: {e}")
 
-# --- RODA NA INICIALIZAÇÃO ---
-# No Render, isso roda toda vez que o servidor sobe
 inicializar_banco()
 
 # --- FUNÇÕES AUXILIARES ---
 def calcular_distancia(lat1, lon1, lat2, lon2):
-    R = 6371
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat/2) * math.sin(dlat/2) + \
-        math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
-        math.sin(dlon/2) * math.sin(dlon/2)
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    return R * c
+    try:
+        R = 6371
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = math.sin(dlat/2) * math.sin(dlat/2) + \
+            math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
+            math.sin(dlon/2) * math.sin(dlon/2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        return R * c
+    except:
+        return 0
 
-# --- ROTAS ---
+# --- ROTAS DA API ---
 
 @app.route('/')
 def home():
-    return jsonify({"status": "online", "banco": "PostgreSQL (Neon)", "msg": "Sistema Profissional Ativo"})
+    return jsonify({"status": "online", "banco": "PostgreSQL Neon", "version": "2.1"})
 
 @app.route('/search', methods=['GET'])
 def search_product():
@@ -102,7 +97,6 @@ def search_product():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Sintaxe Postgres usa %s
         query = '''
             SELECT ph.id, ph.name as farmacia, ph.address, ph.latitude, ph.longitude,
                 st.qty as quantidade, st.price as preco
@@ -162,6 +156,7 @@ def dashboard():
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # 1. Totais para o Gráfico
         query_totais = '''
             SELECT ph.name, COUNT(l.id) as total 
             FROM leads l
@@ -171,13 +166,13 @@ def dashboard():
         cur.execute(query_totais)
         rows_totais = cur.fetchall()
         
-        # No Postgres, para ajustar fuso horário usamos AT TIME ZONE ou intervalo
-        # Vamos simplificar subtraindo 3 horas direto
+        # 2. Detalhes para a Tabela (COM DATA FORMATADA)
+        # Ajusta fuso (-3h) e formata para DD/MM/YYYY HH:MM
         query_detalhe = '''
             SELECT ph.name, l.product_ean, l.action_type, 
-                   (l.created_at - INTERVAL '3 hours')::text as created_at
+                   TO_CHAR(l.created_at - INTERVAL '3 hours', 'DD/MM/YYYY HH24:MI') as data_formatada
             FROM leads l JOIN pharmacies ph ON l.pharmacy_id = ph.id
-            ORDER BY l.created_at DESC LIMIT 10
+            ORDER BY l.created_at DESC LIMIT 20
         '''
         cur.execute(query_detalhe)
         rows_detalhe = cur.fetchall()
@@ -185,9 +180,19 @@ def dashboard():
         cur.close()
         conn.close()
         
+        # Organiza os dados para o Front
+        lista_logs = []
+        for r in rows_detalhe:
+            lista_logs.append({
+                "data": r['data_formatada'],
+                "farmacia": r['name'],
+                "ean": r['product_ean'],
+                "acao": r['action_type']
+            })
+        
         return jsonify({
             "resumo_mensal": {row['name']: row['total'] for row in rows_totais},
-            "auditoria_ultimos_cliques": [f"[{r['created_at'][:19]}] {r['name']} - {r['product_ean']} ({r['action_type']})" for r in rows_detalhe]
+            "auditoria_ultimos_cliques": lista_logs
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -204,10 +209,7 @@ def update_stock():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Limpa estoque antigo
         cur.execute('DELETE FROM stock WHERE pharmacy_id = %s', (farma_id,))
-        
-        # Insere novo
         for item in lista:
             cur.execute('INSERT INTO stock (pharmacy_id, product_ean, qty, price) VALUES (%s, %s, %s, %s)', 
                          (farma_id, item['ean'], item['qty'], item['price']))
