@@ -11,6 +11,9 @@ FARMACIA_ID = 2
 # URL da sua API no Render
 API_URL = "https://api-farma-hub.onrender.com/update_stock"
 
+# 🔐 CHAVE DE SEGURANÇA (Deve ser IGUAL à que está no api.py)
+API_KEY = "farma_segura_2025_x9"
+
 # Nome do arquivo que o sistema da farmácia gera
 ARQUIVO_ORIGINAL = "estoque.csv"
 
@@ -64,19 +67,28 @@ def ler_csv_e_enviar():
         print(f"❌ Erro ao ler CSV: {e}")
         return
 
-    # --- PROTEÇÃO 2: ENVIO SEGURO (Não fecha se cair a internet) ---
+    # --- PROTEÇÃO 2: ENVIO SEGURO COM AUTENTICAÇÃO ---
     if produtos_para_envio:
         print(f"🚀 Enviando {len(produtos_para_envio)} produtos para a Nuvem...")
         
         try:
-            # O timeout=10 impede que o programa trave eternamente se a internet estiver lenta
-            resposta = requests.post(API_URL, json={
-                "pharmacy_id": FARMACIA_ID,
-                "products": produtos_para_envio
-            }, timeout=10)
+            # O timeout=10 impede travamento. 
+            # Headers envia a senha secreta.
+            resposta = requests.post(
+                API_URL, 
+                json={
+                    "pharmacy_id": FARMACIA_ID,
+                    "products": produtos_para_envio
+                }, 
+                headers={'X-API-TOKEN': API_KEY}, # <--- AQUI ESTÁ A SEGURANÇA
+                timeout=10
+            )
             
             if resposta.status_code == 200:
                 print("✅ SUCESSO! Estoque atualizado na nuvem.")
+            elif resposta.status_code == 403:
+                print("⛔ ACESSO NEGADO: A chave de API está incorreta!")
+                print("   -> Verifique se a API_KEY no agent.py é igual à do api.py")
             else:
                 print(f"❌ ERRO NA API: {resposta.status_code} - {resposta.text}")
                 
@@ -98,7 +110,7 @@ def ler_csv_e_enviar():
 
 
 def main():
-    print("🤖 Agente FarmaHub Iniciado v2.0 (Blindado)")
+    print("🤖 Agente FarmaHub Iniciado v3.0 (Blindado + Seguro)")
     print(f"👀 Vigiando arquivo: {ARQUIVO_ORIGINAL}")
     print("------------------------------------------------")
     
@@ -119,7 +131,6 @@ def main():
                     print("⏳ Aguardando próxima atualização do estoque...")
             
             else:
-                # Se o arquivo não existe, avisa mas não fecha
                 pass 
                 
         except Exception as e:
