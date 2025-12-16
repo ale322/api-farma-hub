@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Gestor | FarmaHub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
@@ -15,26 +15,38 @@
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; }
+        .container { max-width: 1200px; margin: 0 auto; }
         
-        header { background: white; padding: 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        h1 { margin: 0; color: #1f2937; font-size: 1.5rem; }
+        /* Header */
+        header { 
+            background: white; padding: 20px; border-radius: 12px; 
+            display: flex; justify-content: space-between; align-items: center; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; 
+        }
+        
+        /* Status Indicator */
+        .status-box { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; }
+        .dot { height: 10px; width: 10px; background-color: #ccc; border-radius: 50%; display: inline-block; }
+        .online { background-color: #10b981; box-shadow: 0 0 8px #10b981; }
+        .offline { background-color: #ef4444; }
+
         .btn-sair { background: #fee2e2; color: #991b1b; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
         
-        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        /* Grid Layout */
+        .grid { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 20px; }
         
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        h2 { margin-top: 0; font-size: 1.1rem; color: #4b5563; }
+        .card-total { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         
-        /* Tabela Estilizada */
+        h2 { margin-top: 0; font-size: 1rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        .big-number { font-size: 3rem; font-weight: 800; color: #2563EB; margin: 10px 0; }
+        
+        /* Tabela */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { text-align: left; padding: 12px; background: #f9fafb; color: #6b7280; font-size: 0.85rem; font-weight: 600; border-bottom: 1px solid #e5e7eb; }
         td { padding: 12px; border-bottom: 1px solid #e5e7eb; color: #1f2937; font-size: 0.9rem; }
-        tr:last-child td { border-bottom: none; }
-        
-        .badge { background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 500; }
-        
-        /* Responsivo */
+        .badge { background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; text-transform: uppercase; }
+
         @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -43,30 +55,41 @@
 <div class="container">
     <header>
         <div>
-            <h1>FarmaHub Dashboard</h1>
-            <span style="color: #6b7280; font-size: 0.9rem;">Visão Geral em Tempo Real</span>
+            <h1 style="margin:0; font-size: 1.5rem;">FarmaHub Dashboard</h1>
+            <div class="status-box">
+                <span id="status-dot" class="dot"></span>
+                <span id="status-text">Conectando...</span>
+            </div>
         </div>
-        <button class="btn-sair" onclick="sair()">Sair</button>
+        <button class="btn-sair" onclick="sair()">Sair do Sistema</button>
     </header>
 
     <div class="grid">
-        <div class="card">
-            <h2>Vendas por Farmácia</h2>
-            <canvas id="graficoVendas"></canvas>
+        <div class="card card-total">
+            <h2>Total de Reservas</h2>
+            <div id="total-count" class="big-number">--</div>
+            <span style="color:#6b7280; font-size:0.9rem">no período</span>
         </div>
 
         <div class="card">
-            <h2>Últimas Interações (Leads)</h2>
+            <h2>Performance</h2>
+            <div style="height: 200px; display:flex; justify-content:center;">
+                <canvas id="graficoVendas"></canvas>
+            </div>
+        </div>
+
+        <div class="card" style="grid-column: span 3;"> <h2>Últimas Interações (Tempo Real)</h2>
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 140px;">Data/Hora</th> <th>Farmácia</th>
+                        <th>Data/Hora</th>
+                        <th>Farmácia</th>
                         <th>Produto (EAN)</th>
                         <th>Ação</th>
                     </tr>
                 </thead>
                 <tbody id="tabela-logs">
-                    <tr><td colspan="4">Carregando dados...</td></tr>
+                    <tr><td colspan="4" style="text-align:center;">Carregando dados...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -75,6 +98,7 @@
 
 <script>
     const API_URL = "https://api-farma-hub.onrender.com/dashboard";
+    let chartInstance = null; // Variável para guardar o gráfico e destruir depois
 
     function sair() {
         sessionStorage.removeItem("farma_token_acesso");
@@ -82,33 +106,58 @@
     }
 
     async function carregarDashboard() {
+        const dot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
         try {
             const res = await fetch(API_URL);
+            
+            if (!res.ok) throw new Error("Erro na API");
+            
             const data = await res.json();
 
-            // 1. Atualizar Gráfico
+            // ✅ 1. Atualizar Status (Ficou Online)
+            dot.className = "dot online";
+            statusText.innerText = "Sistema Online";
+            statusText.style.color = "#10b981";
+
+            // ✅ 2. Atualizar Total Numérico
+            const total = Object.values(data.resumo_mensal).reduce((a, b) => a + b, 0);
+            document.getElementById('total-count').innerText = total;
+
+            // ✅ 3. Atualizar Gráfico (Com correção de bug)
             const ctx = document.getElementById('graficoVendas').getContext('2d');
-            new Chart(ctx, {
+            
+            // Destroi o gráfico anterior se existir (CRÍTICO PARA NÃO TRAVAR)
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: Object.keys(data.resumo_mensal),
                     datasets: [{
                         data: Object.values(data.resumo_mensal),
-                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b']
+                        backgroundColor: ['#2563EB', '#10b981', '#F59E0B'],
+                        borderWidth: 0
                     }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } }
                 }
             });
 
-            // 2. Atualizar Tabela (Com a nova coluna de Data)
+            // ✅ 4. Atualizar Tabela
             const tabela = document.getElementById('tabela-logs');
             tabela.innerHTML = '';
 
             data.auditoria_ultimos_cliques.forEach(log => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td style="color: #666; font-weight: 500; font-size: 0.85em;">
-                        ${log.data}
-                    </td>
+                    <td style="color: #4b5563; font-weight: 500;">${log.data}</td>
                     <td>${log.farmacia}</td>
                     <td>${log.ean}</td>
                     <td><span class="badge">${log.acao}</span></td>
@@ -117,15 +166,19 @@
             });
 
         } catch (error) {
-            console.error("Erro ao carregar dashboard:", error);
+            console.error("Erro:", error);
+            // Mostra status offline se der erro
+            dot.className = "dot offline";
+            statusText.innerText = "Desconectado/Erro";
+            statusText.style.color = "#ef4444";
         }
     }
 
-    // Carrega ao iniciar
+    // Carrega ao abrir
     carregarDashboard();
     
-    // Atualiza a cada 30 segundos
-    setInterval(carregarDashboard, 30000);
+    // Atualiza a cada 5 segundos (Tempo Real)
+    setInterval(carregarDashboard, 5000);
 </script>
 
 </body>
