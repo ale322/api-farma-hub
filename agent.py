@@ -1,61 +1,131 @@
-import requests
 import time
-import random
+import requests
+import csv
+import os
+import shutil  # Biblioteca para copiar arquivos
 
-# CONFIGURAÇÕES DA FARMÁCIA (Isso estaria num arquivo config.ini na vida real)
-API_URL = "https://api-farma-hub.onrender.com/sync"
-API_KEY = "key_farma_01" # A mesma chave que cadastramos no banco de dados
+# --- CONFIGURAÇÕES DO SISTEMA ---
+# Substitua pelo ID da farmácia que você cadastrou no banco
+FARMACIA_ID = 2 
 
-# Simulação do ERP Local da Farmácia
-# Na vida real, aqui leríamos do SQL Server ou MySQL da loja
-def ler_erp_local():
-    print("--- Lendo ERP Local... ---")
-    
-    # Vamos simular que o estoque muda aleatoriamente para testar
-    estoque_atual = [
-        {
-            "ean": "789101010", # Dipirona
-            "qty": random.randint(10, 60), # Gera um número entre 10 e 60
-            "price": 10.50
-        },
-        {
-            "ean": "789202020", # Tylenol
-            "qty": random.randint(0, 5), # Gera entre 0 e 5 (às vezes falta!)
-            "price": 28.90
-        }
-    ]
-    return estoque_atual
+# URL da sua API no Render
+API_URL = "https://api-farma-hub.onrender.com/update_stock"
 
-def enviar_para_nuvem(dados_estoque):
-    payload = {
-        "estoque": dados_estoque
-    }
-    
-    headers = {
-        "X-API-KEY": API_KEY,
-        "Content-Type": "application/json"
-    }
+# Nome do arquivo que o sistema da farmácia gera
+ARQUIVO_ORIGINAL = "estoque.csv"
+
+# Nome do arquivo temporário (Cópia de segurança para leitura)
+ARQUIVO_TEMP = "temp_estoque_leitura.csv"
+
+
+def ler_csv_e_enviar():
+    print(f"\n📂 Detectada alteração! Iniciando processamento...")
+
+    # --- PROTEÇÃO 1: SHADOW COPY (Evita erro se o Excel estiver aberto) ---
+    try:
+        shutil.copyfile(ARQUIVO_ORIGINAL, ARQUIVO_TEMP)
+    except PermissionError:
+        print("⚠️ ALERTA: O arquivo 'estoque.csv' está bloqueado pelo sistema/Excel.")
+        print("   -> Tentarei novamente em 5 segundos...")
+        return # Aborta esta tentativa, mas mantem o programa rodando
+    except FileNotFoundError:
+        print("❌ ERRO: Arquivo 'estoque.csv' sumiu da pasta.")
+        return
+    except Exception as e:
+        print(f"❌ ERRO ao copiar arquivo: {e}")
+        return
+
+    # --- LEITURA DOS DADOS (Lê a cópia, nunca o original) ---
+    produtos_para_envio = []
     
     try:
-        print(f"Enviando {len(dados_estoque)} produtos para a nuvem...")
-        resposta = requests.post(API_URL, json=payload, headers=headers)
-        
-        if resposta.status_code == 200:
-            print("✅ SUCESSO! Nuvem respondeu: ", resposta.json())
-        elif resposta.status_code == 401:
-            print("❌ ERRO: Chave de API inválida!")
-        else:
-            print(f"⚠️ AVISO: Erro {resposta.status_code}")
+        with open(ARQUIVO_TEMP, mode='r', encoding='utf-8') as file:
+            leitor = csv.DictReader(file)
             
-    except requests.exceptions.ConnectionError:
-        print("❌ ERRO: Não foi possível conectar na API. O servidor está rodando?")
+            print("   --- Lendo Produtos ---")
+            for linha in leitor:
+                try:
+                    # Converte e valida os dados
+                    item = {
+                        "ean": linha["EAN"].strip(),
+                        "qty": int(linha["QUANTIDADE"]),
+                        "price": float(linha["PRECO"].replace(',', '.')) # Garante que lê 9,50 ou 9.50
+                    }
+                    
+                    # Mostra no terminal o que está lendo (Visualização)
+                    print(f"   -> Item: {item['ean']} | Est: {item['qty']} | R$ {item['price']:.2f}")
+                    
+                    produtos_para_envio.append(item)
+                except ValueError:
+                    print(f"   ⚠️ Linha ignorada (dados inválidos): {linha}")
+                    continue
+
+    except Exception as e:
+        print(f"❌ Erro ao ler CSV: {e}")
+        return
+
+    # --- PROTEÇÃO 2: ENVIO SEGURO (Não fecha se cair a internet) ---
+    if produtos_para_envio:
+        print(f"🚀 Enviando {len(produtos_para_envio)} produtos para a Nuvem...")
+        
+        try:
+            # O timeout=10 impede que o programa trave eternamente se a internet estiver lenta
+            resposta = requests.post(API_URL, json={
+                "pharmacy_id": FARMACIA_ID,
+                "products": produtos_para_envio
+            }, timeout=10)
+            
+            if resposta.status_code == 200:
+                print("✅ SUCESSO! Estoque atualizado na nuvem.")
+            else:
+                print(f"❌ ERRO NA API: {resposta.status_code} - {resposta.text}")
+                
+        except requests.exceptions.ConnectionError:
+            print("⚠️ SEM INTERNET: Não foi possível conectar ao servidor.")
+            print("   -> Os dados serão enviados assim que a conexão voltar.")
+        except requests.exceptions.Timeout:
+            print("⚠️ TIMEOUT: O servidor demorou muito para responder.")
+        except Exception as e:
+            print(f"❌ ERRO DESCONHECIDO NO ENVIO: {e}")
+    else:
+        print("⚠️ O arquivo CSV estava vazio ou sem produtos válidos.")
+
+    # Remove o arquivo temporário para não deixar lixo na pasta
+    try:
+        os.remove(ARQUIVO_TEMP)
+    except:
+        pass
+
+
+def main():
+    print("🤖 Agente FarmaHub Iniciado v2.0 (Blindado)")
+    print(f"👀 Vigiando arquivo: {ARQUIVO_ORIGINAL}")
+    print("------------------------------------------------")
+    
+    ultimo_processamento = 0
+    
+    while True:
+        try:
+            if os.path.exists(ARQUIVO_ORIGINAL):
+                data_modificacao = os.path.getmtime(ARQUIVO_ORIGINAL)
+                
+                # Se o arquivo mudou desde a última vez
+                if data_modificacao > ultimo_processamento:
+                    # Pequena pausa para garantir que o sistema da farmácia terminou de salvar o arquivo
+                    time.sleep(1) 
+                    
+                    ler_csv_e_enviar()
+                    ultimo_processamento = data_modificacao
+                    print("⏳ Aguardando próxima atualização do estoque...")
+            
+            else:
+                # Se o arquivo não existe, avisa mas não fecha
+                pass 
+                
+        except Exception as e:
+            print(f"❌ Erro fatal no loop principal: {e}")
+            
+        time.sleep(5) # Verifica a cada 5 segundos
 
 if __name__ == "__main__":
-    # Loop infinito (simula o serviço rodando 24h)
-    while True:
-        dados = ler_erp_local()
-        enviar_para_nuvem(dados)
-        
-        print("Dormindo por 10 segundos...")
-        print("-" * 30)
-        time.sleep(10) # Espera 10 segundos antes de enviar de novo
+    main()
