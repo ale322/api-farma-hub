@@ -78,7 +78,8 @@
             </div>
         </div>
 
-        <div class="card" style="grid-column: span 3;"> <h2>Últimas Interações (Tempo Real)</h2>
+        <div class="card" style="grid-column: span 3;">
+            <h2>Últimas Interações (Tempo Real)</h2>
             <table>
                 <thead>
                     <tr>
@@ -98,7 +99,7 @@
 
 <script>
     const API_URL = "https://api-farma-hub.onrender.com/dashboard";
-    let chartInstance = null; // Variável para guardar o gráfico e destruir depois
+    let chartInstance = null; // Guarda o gráfico na memória
 
     function sair() {
         sessionStorage.removeItem("farma_token_acesso");
@@ -116,42 +117,49 @@
             
             const data = await res.json();
 
-            // ✅ 1. Atualizar Status (Ficou Online)
+            // ✅ 1. Atualizar Status
             dot.className = "dot online";
             statusText.innerText = "Sistema Online";
             statusText.style.color = "#10b981";
 
-            // ✅ 2. Atualizar Total Numérico
+            // ✅ 2. Atualizar Total
             const total = Object.values(data.resumo_mensal).reduce((a, b) => a + b, 0);
             document.getElementById('total-count').innerText = total;
 
-            // ✅ 3. Atualizar Gráfico (Com correção de bug)
+            // ✅ 3. Atualizar Gráfico (SEM PISCAR)
             const ctx = document.getElementById('graficoVendas').getContext('2d');
-            
-            // Destroi o gráfico anterior se existir (CRÍTICO PARA NÃO TRAVAR)
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
+            const labels = Object.keys(data.resumo_mensal);
+            const valores = Object.values(data.resumo_mensal);
 
-            chartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(data.resumo_mensal),
-                    datasets: [{
-                        data: Object.values(data.resumo_mensal),
-                        backgroundColor: ['#2563EB', '#10b981', '#F59E0B'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } }
-                }
-            });
+            if (chartInstance) {
+                // Se o gráfico JÁ EXISTE, apenas trocamos os dados
+                chartInstance.data.labels = labels;
+                chartInstance.data.datasets[0].data = valores;
+                chartInstance.update(); // Atualiza suavemente (sem animação do zero)
+            } else {
+                // Se NÃO EXISTE, cria pela primeira vez
+                chartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: valores,
+                            backgroundColor: ['#2563EB', '#10b981', '#F59E0B'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right' } }
+                    }
+                });
+            }
 
             // ✅ 4. Atualizar Tabela
             const tabela = document.getElementById('tabela-logs');
+            // Salvamos o HTML atual para comparar e evitar piscar se for igual (opcional, mas bom)
+            // Aqui vamos recriar simples, pois texto não pisca tanto quanto gráfico
             tabela.innerHTML = '';
 
             data.auditoria_ultimos_cliques.forEach(log => {
@@ -167,17 +175,16 @@
 
         } catch (error) {
             console.error("Erro:", error);
-            // Mostra status offline se der erro
             dot.className = "dot offline";
             statusText.innerText = "Desconectado/Erro";
             statusText.style.color = "#ef4444";
         }
     }
 
-    // Carrega ao abrir
+    // Carrega ao iniciar
     carregarDashboard();
     
-    // Atualiza a cada 5 segundos (Tempo Real)
+    // Atualiza a cada 5 segundos
     setInterval(carregarDashboard, 5000);
 </script>
 
